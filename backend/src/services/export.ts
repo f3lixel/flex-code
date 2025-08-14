@@ -2,35 +2,29 @@ import { exec } from "child_process";
 import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
+import * as processService from "./process";
 
 const execAsync = promisify(exec);
 
-export async function exportContainerCode(
-  containerId: string
-): Promise<Buffer> {
-  const tempDir = `/tmp/export-${containerId}-${Date.now()}`;
+export async function exportContainerCode(id: string): Promise<Buffer> {
+  const projectPath = processService.getProjectPath(id);
+  if (!projectPath) throw new Error("Prozess nicht gefunden");
+
+  const tempDir = `/tmp/export-${id}-${Date.now()}`;
   const zipPath = `${tempDir}.zip`;
 
   try {
     await fs.mkdir(tempDir, { recursive: true });
-
-    const copyCommand = `docker cp ${containerId}:/app/my-nextjs-app/. ${tempDir}/`;
-    await execAsync(copyCommand);
-
-    const nodeModulesPath = path.join(tempDir, "node_modules");
-    const nextPath = path.join(tempDir, ".next");
+    await fs.cp(projectPath, tempDir, { recursive: true });
 
     try {
-      await fs.rm(nodeModulesPath, { recursive: true, force: true });
+      await fs.rm(path.join(tempDir, "node_modules"), { recursive: true, force: true });
     } catch {}
-
     try {
-      await fs.rm(nextPath, { recursive: true, force: true });
+      await fs.rm(path.join(tempDir, ".next"), { recursive: true, force: true });
     } catch {}
 
-    const zipCommand = `cd ${tempDir} && zip -r ${zipPath} . -x "*.DS_Store"`;
-    await execAsync(zipCommand);
-
+    await execAsync(`cd ${tempDir} && zip -r ${zipPath} . -x "*.DS_Store"`);
     const zipBuffer = await fs.readFile(zipPath);
 
     await fs.rm(tempDir, { recursive: true, force: true });
@@ -42,11 +36,8 @@ export async function exportContainerCode(
       await fs.rm(tempDir, { recursive: true, force: true });
       await fs.rm(zipPath, { force: true });
     } catch {}
-
     throw new Error(
-      `Export failed: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
+      `Export fehlgeschlagen: ${error instanceof Error ? error.message : "Unknown error"}`
     );
   }
 }
