@@ -1,6 +1,6 @@
 import express from "express";
 import { v4 as uuidv4 } from "uuid";
-import * as dockerService from "../services/docker";
+import * as processService from "../services/process";
 import * as exportService from "../services/export";
 import * as fileService from "../services/file";
 import * as packageService from "../services/package";
@@ -9,7 +9,7 @@ const router = express.Router();
 
 router.get("/", async (req, res) => {
   try {
-    const containers = await dockerService.listProjectContainers();
+    const containers = await processService.listProjectProcesses();
 
     res.json({
       success: true,
@@ -27,28 +27,21 @@ router.post("/create", async (req, res) => {
   const containerId = uuidv4();
 
   try {
-    const imageName = await dockerService.buildImage(containerId);
-    const { container, port } = await dockerService.createContainer(
-      imageName,
-      containerId
-    );
+    const { port } = await processService.createProcess(containerId);
 
     res.json({
       success: true,
-      containerId: container.id,
+      containerId,
       container: {
         id: containerId,
-        containerId: container.id,
         status: "running",
-        port: port,
+        port,
         url: `http://localhost:${port}`,
         createdAt: new Date().toISOString(),
         type: "Next.js App",
       },
     });
   } catch (error) {
-    await dockerService.cleanupImage(containerId);
-
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
@@ -60,7 +53,7 @@ router.post("/:containerId/start", async (req, res) => {
   const { containerId } = req.params;
 
   try {
-    const { port } = await dockerService.startContainer(containerId);
+    const { port } = await processService.startProcess(containerId);
 
     res.json({
       success: true,
@@ -68,7 +61,7 @@ router.post("/:containerId/start", async (req, res) => {
       port,
       url: `http://localhost:${port}`,
       status: "running",
-      message: "Container started successfully",
+      message: "Prozess erfolgreich gestartet",
     });
   } catch (error) {
     res.status(500).json({
@@ -82,13 +75,13 @@ router.post("/:containerId/stop", async (req, res) => {
   const { containerId } = req.params;
 
   try {
-    await dockerService.stopContainer(containerId);
+    await processService.stopProcess(containerId);
 
     res.json({
       success: true,
       containerId,
       status: "stopped",
-      message: "Container stopped successfully",
+      message: "Prozess erfolgreich gestoppt",
     });
   } catch (error) {
     res.status(500).json({
@@ -102,12 +95,12 @@ router.delete("/:containerId", async (req, res) => {
   const { containerId } = req.params;
 
   try {
-    await dockerService.deleteContainer(containerId);
+    await processService.deleteProcess(containerId);
 
     res.json({
       success: true,
       containerId,
-      message: "Container deleted successfully",
+      message: "Prozess erfolgreich gelöscht",
     });
   } catch (error) {
     res.status(500).json({
@@ -119,11 +112,10 @@ router.delete("/:containerId", async (req, res) => {
 
 router.get("/:containerId/files", async (req, res) => {
   const { containerId } = req.params;
-  const { path: containerPath = "/app/my-nextjs-app" } = req.query;
+  const { path: containerPath = "." } = req.query;
 
   try {
     const files = await fileService.listFiles(
-      dockerService.docker,
       containerId,
       containerPath as string
     );
@@ -145,10 +137,7 @@ router.get("/:containerId/file-tree", async (req, res) => {
   const { containerId } = req.params;
 
   try {
-    const fileTree = await fileService.getFileTree(
-      dockerService.docker,
-      containerId
-    );
+    const fileTree = await fileService.getFileTree(containerId);
 
     res.json({
       success: true,
@@ -166,10 +155,7 @@ router.get("/:containerId/file-content-tree", async (req, res) => {
   const { containerId } = req.params;
 
   try {
-    const fileContentTree = await fileService.getFileContentTree(
-      dockerService.docker,
-      containerId
-    );
+    const fileContentTree = await fileService.getFileContentTree(containerId);
 
     res.json({
       success: true,
@@ -197,7 +183,6 @@ router.get("/:containerId/file", async (req, res) => {
 
   try {
     const content = await fileService.readFile(
-      dockerService.docker,
       containerId,
       filePath as string
     );
