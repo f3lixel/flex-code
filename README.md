@@ -26,7 +26,7 @@
 ## Features
 
     ✅ AI-powered project creation from natural language prompts
-    ✅ Containerized Next.js applications with Docker
+    ✅ Next.js applications running locally with Node.js
     ✅ Live preview with mobile and desktop views
     ✅ Full-featured Monaco code editor with file management
     ✅ Real-time chat assistant for development help
@@ -50,7 +50,7 @@
 
 2. Get an API Key from any OpenAI sdk compatible provider (e.g. OpenAI, Claude, Ollama, OpenRouter, etc.) and set it in the `config.ts` file.
 
-   The start.sh script will automatically copy over the file into the backend folder.
+   Copy this file into the backend folder before starting the servers.
 
    I highly recommend using Sonnet-4 from Anthropic as it is the best coding model available right now.
 
@@ -64,25 +64,33 @@
     temperature: 0.7,
    ```
 
-3. Install docker (Docker Desktop is the easiest way to get started)
+3. Install [Node.js](https://nodejs.org/) (v18 or later) and [pnpm](https://pnpm.io/installation).
 
-   - [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
-   - [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
-   - [Docker Engine for Linux](https://docs.docker.com/engine/install/)
-
-   Make sure you have Docker running and the Docker CLI installed before proceeding.
-
-4. Run the start script to set up the environment
+4. Install dependencies for both backend and frontend:
 
    ```sh
-   sh start.sh
+   cd backend && pnpm install
+   cd ../frontend && pnpm install
    ```
 
-5. The application will start in development mode, and you can access it at [http://localhost:3000](http://localhost:3000).
+5. Start the development servers (use separate terminals):
 
-   The backend will run on port 4000, and the frontend will run on port 3000.
+   ```sh
+   cd backend && pnpm dev
+   cd frontend && pnpm dev
+   ```
+
+6. The application will start in development mode, and you can access it at [http://localhost:3000](http://localhost:3000).
+
+   The backend runs on port 4000, and the frontend runs on port 3000.
 
    You can now start building your applications with December! 🥳
+
+### Troubleshooting
+
+- **Backend unreachable on port 4000** – Ensure the backend process is running and that no other service is using port 4000 (`lsof -i :4000`).
+- **Frontend not loading on port 3000** – Check that the frontend dev server is running and port 3000 is free (`lsof -i :3000`).
+- **pnpm command not found** – Install pnpm globally (`npm install -g pnpm`) or enable it via Corepack.
 
 <!-- ## Demo
 
