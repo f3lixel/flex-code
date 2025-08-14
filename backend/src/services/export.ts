@@ -5,37 +5,29 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
-export async function exportContainerCode(
-  containerId: string
-): Promise<Buffer> {
-  const tempDir = `/tmp/export-${containerId}-${Date.now()}`;
+export async function exportProjectCode(projectPath: string): Promise<Buffer> {
+  const tempDir = `/tmp/export-${Date.now()}`;
   const zipPath = `${tempDir}.zip`;
 
   try {
+    await execAsync("pnpm build", { cwd: projectPath });
     await fs.mkdir(tempDir, { recursive: true });
-
-    const copyCommand = `docker cp ${containerId}:/app/my-nextjs-app/. ${tempDir}/`;
-    await execAsync(copyCommand);
+    await execAsync(`cp -R ${projectPath}/. ${tempDir}/`);
 
     const nodeModulesPath = path.join(tempDir, "node_modules");
     const nextPath = path.join(tempDir, ".next");
-
     try {
       await fs.rm(nodeModulesPath, { recursive: true, force: true });
     } catch {}
-
     try {
       await fs.rm(nextPath, { recursive: true, force: true });
     } catch {}
 
-    const zipCommand = `cd ${tempDir} && zip -r ${zipPath} . -x "*.DS_Store"`;
-    await execAsync(zipCommand);
-
+    await execAsync(`zip -r ${zipPath} . -x "*.DS_Store"`, { cwd: tempDir });
     const zipBuffer = await fs.readFile(zipPath);
 
     await fs.rm(tempDir, { recursive: true, force: true });
     await fs.rm(zipPath, { force: true });
-
     return zipBuffer;
   } catch (error) {
     try {
