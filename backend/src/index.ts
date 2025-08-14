@@ -26,8 +26,11 @@ app.use("/containers", containerRoutes);
 app.use("/chat", chatRoutes);
 
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`Docker Container API running on port ${PORT}`);
-});
+
+if (process.env.NODE_ENV !== "test") {
+  app.listen(PORT, () => {
+    console.log(`Docker Container API running on port ${PORT}`);
+  });
+}
 
 export default app;
