@@ -1,5 +1,8 @@
 import fs from "fs/promises";
 import path from "path";
+import * as processService from "./process";
+
+const IGNORED = ["node_modules", ".next"];
 
 export interface FileItem {
   name: string;
@@ -17,114 +20,124 @@ export interface FileContentItem {
   children?: FileContentItem[];
 }
 
-function resolvePath(projectPath: string, filePath: string): string {
-  return path.isAbsolute(filePath)
-    ? filePath
-    : path.join(projectPath, filePath);
-}
-
-async function walk(
-  dir: string,
-  includeContent: boolean
-): Promise<(FileItem | FileContentItem)[]> {
-  const entries = await fs.readdir(dir, { withFileTypes: true });
-  const results: (FileItem | FileContentItem)[] = [];
-
-  for (const entry of entries) {
-    if (entry.name === "node_modules" || entry.name === ".next") continue;
-    const fullPath = path.join(dir, entry.name);
-
-    if (entry.isDirectory()) {
-      const children = await walk(fullPath, includeContent);
-      results.push({
-        name: entry.name,
-        path: fullPath,
-        type: "directory",
-        children,
-      });
-    } else {
-      const item: any = {
-        name: entry.name,
-        path: fullPath,
-        type: "file",
-      };
-      if (includeContent) {
-        item.content = await fs.readFile(fullPath, "utf8");
-      }
-      results.push(item);
-    }
-  }
-
-  return results;
-}
-
-export async function getFileTree(projectPath: string): Promise<FileItem[]> {
-  return (await walk(projectPath, false)) as FileItem[];
-}
-
-export async function getFileContentTree(
-  projectPath: string
-): Promise<FileContentItem[]> {
-  return (await walk(projectPath, true)) as FileContentItem[];
-}
-
-export async function readFile(
-  projectPath: string,
-  filePath: string
-): Promise<string> {
-  const absolute = resolvePath(projectPath, filePath);
-  const content = await fs.readFile(absolute, "utf8");
-  return content.replace(/^\uFEFF/, "");
+function getBasePath(id: string): string {
+  const cwd = processService.getProjectPath(id);
+  if (!cwd) throw new Error("Prozess nicht gefunden");
+  return cwd;
 }
 
 export async function listFiles(
-  projectPath: string,
-  dirPath: string = projectPath
+  id: string,
+  dir: string = "."
 ): Promise<any[]> {
-  const absolute = resolvePath(projectPath, dirPath);
-  const entries = await fs.readdir(absolute, { withFileTypes: true });
-  const results = [];
-
+  const abs = path.join(getBasePath(id), dir);
+  const entries = await fs.readdir(abs, { withFileTypes: true });
+  const result: any[] = [];
   for (const entry of entries) {
-    const fullPath = path.join(absolute, entry.name);
-    const stat = await fs.stat(fullPath);
-    results.push({
+    if (IGNORED.includes(entry.name)) continue;
+    const stat = await fs.stat(path.join(abs, entry.name));
+    result.push({
       name: entry.name,
       type: entry.isDirectory() ? "directory" : "file",
-      permissions: (stat.mode & 0o777).toString(8),
-      size: stat.size.toString(),
+      size: stat.size,
       modified: stat.mtime.toISOString(),
     });
   }
+  return result;
+}
 
-  return results;
+async function walk(dir: string): Promise<FileItem[]> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const items: FileItem[] = [];
+  for (const entry of entries) {
+    if (IGNORED.includes(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      items.push({
+        name: entry.name,
+        path: full,
+        type: "directory",
+        children: await walk(full),
+      });
+    } else {
+      items.push({ name: entry.name, path: full, type: "file" });
+    }
+  }
+  return items;
+}
+
+export async function getFileTree(
+  id: string,
+  dir: string = "."
+): Promise<FileItem[]> {
+  const abs = path.join(getBasePath(id), dir);
+  return await walk(abs);
+}
+
+async function walkWithContent(dir: string): Promise<FileContentItem[]> {
+  const entries = await fs.readdir(dir, { withFileTypes: true });
+  const items: FileContentItem[] = [];
+  for (const entry of entries) {
+    if (IGNORED.includes(entry.name)) continue;
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      items.push({
+        name: entry.name,
+        path: full,
+        type: "directory",
+        children: await walkWithContent(full),
+      });
+    } else {
+      const content = await fs.readFile(full, "utf8");
+      items.push({ name: entry.name, path: full, type: "file", content });
+    }
+  }
+  return items;
+}
+
+export async function getFileContentTree(
+  id: string,
+  dir: string = "."
+): Promise<FileContentItem[]> {
+  const abs = path.join(getBasePath(id), dir);
+  return await walkWithContent(abs);
+}
+
+export async function readFile(
+  id: string,
+  filePath: string
+): Promise<string> {
+  const abs = path.join(getBasePath(id), filePath);
+  const content = await fs.readFile(abs, "utf8");
+  return content.replace(/^\uFEFF/, "");
 }
 
 export async function writeFile(
-  projectPath: string,
+  id: string,
   filePath: string,
   content: string
 ): Promise<void> {
-  const absolute = resolvePath(projectPath, filePath);
-  await fs.mkdir(path.dirname(absolute), { recursive: true });
-  await fs.writeFile(absolute, content, "utf8");
+  const abs = path.join(getBasePath(id), filePath);
+  await fs.mkdir(path.dirname(abs), { recursive: true });
+  await fs.writeFile(abs, content, "utf8");
 }
 
 export async function renameFile(
-  projectPath: string,
+  id: string,
   oldPath: string,
   newPath: string
 ): Promise<void> {
-  const absOld = resolvePath(projectPath, oldPath);
-  const absNew = resolvePath(projectPath, newPath);
+  const absOld = path.join(getBasePath(id), oldPath);
+  const absNew = path.join(getBasePath(id), newPath);
   await fs.mkdir(path.dirname(absNew), { recursive: true });
   await fs.rename(absOld, absNew);
 }
 
 export async function removeFile(
-  projectPath: string,
+  id: string,
   filePath: string
 ): Promise<void> {
-  const absolute = resolvePath(projectPath, filePath);
-  await fs.rm(absolute, { recursive: true, force: true });
+  const abs = path.join(getBasePath(id), filePath);
+  await fs.rm(abs, { recursive: true, force: true });
 }
+

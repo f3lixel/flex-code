@@ -2,26 +2,30 @@ import { exec } from "child_process";
 import fs from "fs/promises";
 import path from "path";
 import { promisify } from "util";
+import * as processService from "./process";
 
 const execAsync = promisify(exec);
 
-export async function exportProjectCode(projectPath: string): Promise<Buffer> {
-  const tempDir = `/tmp/export-${Date.now()}`;
+export async function exportContainerCode(id: string): Promise<Buffer> {
+  const projectPath = processService.getProjectPath(id);
+  if (!projectPath) throw new Error("Prozess nicht gefunden");
+
+  const tempDir = `/tmp/export-${id}-${Date.now()}`;
   const zipPath = `${tempDir}.zip`;
 
   try {
     await execAsync("pnpm build", { cwd: projectPath });
     await fs.mkdir(tempDir, { recursive: true });
-    await execAsync(`cp -R ${projectPath}/. ${tempDir}/`);
+    await fs.cp(projectPath, tempDir, { recursive: true });
 
-    const nodeModulesPath = path.join(tempDir, "node_modules");
-    const nextPath = path.join(tempDir, ".next");
-    try {
-      await fs.rm(nodeModulesPath, { recursive: true, force: true });
-    } catch {}
-    try {
-      await fs.rm(nextPath, { recursive: true, force: true });
-    } catch {}
+    await fs.rm(path.join(tempDir, "node_modules"), {
+      recursive: true,
+      force: true,
+    });
+    await fs.rm(path.join(tempDir, ".next"), {
+      recursive: true,
+      force: true,
+    });
 
     await execAsync(`zip -r ${zipPath} . -x "*.DS_Store"`, { cwd: tempDir });
     const zipBuffer = await fs.readFile(zipPath);
@@ -34,11 +38,11 @@ export async function exportProjectCode(projectPath: string): Promise<Buffer> {
       await fs.rm(tempDir, { recursive: true, force: true });
       await fs.rm(zipPath, { force: true });
     } catch {}
-
     throw new Error(
-      `Export failed: ${
+      `Export fehlgeschlagen: ${
         error instanceof Error ? error.message : "Unknown error"
       }`
     );
   }
 }
+
