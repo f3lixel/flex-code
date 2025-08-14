@@ -43,11 +43,11 @@ export const CreateProjectCard = ({
             </div>
             <div className="text-center">
               <span className="text-lg font-semibold text-white mb-2 block">
-                Creating project... (the first time will take a bit longer due
-                to container setup)
+                Creating project... (the first time will take a bit longer during
+                initial setup)
               </span>
               <span className="text-sm text-white/60">
-                Setting up your container
+                Preparing your project
               </span>
             </div>
           </div>
@@ -67,7 +67,7 @@ export const CreateProjectCard = ({
                 Start a new Next.js application
                 <br />
                 <span className="text-white/50">
-                  with Docker containerization
+                  running locally
                 </span>
               </span>
             </div>
