@@ -4,12 +4,16 @@ echo "Starting backend server..."
 
 # copy config file to backend directory
 cp config.ts backend/config.ts
-cd backend && bun src/index.ts &
+cd backend && pnpm dev &
+BACKEND_PID=$!
+cd ..
 
 echo "Starting frontend server..."
-cd frontend && bun dev &
+cd frontend && pnpm dev &
+FRONTEND_PID=$!
+cd ..
 
 echo "Both servers are starting..."
 echo "Press Ctrl+C to stop both servers"
 
-wait
+wait $BACKEND_PID $FRONTEND_PID
