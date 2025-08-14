@@ -42,6 +42,12 @@
 
 ## Get started
 
+### Prerequisites
+
+- Node.js 20 or later
+- pnpm 9 or later
+- Docker
+
 1. Clone the repo
 
    ```sh
